@@ -21,8 +21,9 @@ import Dict exposing (..)
 import Json.Encode as JE exposing (..)
 import Json.Decode as JD exposing (..)
 import Utils.Json as JsonU exposing ((///), (<||))
-import Slate.Common.Event exposing (Event, EventData(..))
+import Slate.Common.Entity exposing (..)
 import Slate.Common.Mutation exposing (..)
+import Slate.Common.Event exposing (Event, EventData(..))
 import Slate.Common.Reference exposing (EntityReference, lookupEntity)
 import Utils.Ops exposing (..)
 
@@ -40,7 +41,7 @@ type alias EntireAddress =
 {-| Entire Address Dictionary
 -}
 type alias EntireAddressDict =
-    Dict EntityReference EntireAddress
+    EntityDict EntireAddress
 
 
 {-| Starting point for all Addresses

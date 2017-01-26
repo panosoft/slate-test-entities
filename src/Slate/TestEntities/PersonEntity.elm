@@ -22,6 +22,7 @@ import Dict exposing (..)
 import Json.Encode as JE exposing (..)
 import Json.Decode as JD exposing (..)
 import Utils.Json as JsonU exposing ((///), (<||))
+import Slate.Common.Entity exposing (..)
 import Slate.Common.Mutation exposing (..)
 import Slate.Common.Event exposing (EventRecord, Event, EventData(..))
 import Slate.Common.Reference exposing (..)
@@ -45,7 +46,7 @@ type alias EntirePerson =
 {-| Entire Person Dictionary
 -}
 type alias EntirePersonDict =
-    Dict EntityReference EntirePerson
+    EntityDict EntirePerson
 
 
 {-| Starting point for all subSets of Person
