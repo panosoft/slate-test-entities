@@ -23,8 +23,8 @@ import Json.Decode as JD exposing (..)
 import Utils.Json as JsonU exposing ((///), (<||))
 import Slate.Common.Entity exposing (..)
 import Slate.Common.Mutation exposing (..)
-import Slate.Common.Event exposing (Event, EventData(..))
-import Slate.Common.Reference exposing (EntityReference, lookupEntity)
+import Slate.Common.Event exposing (..)
+import Slate.Common.Reference exposing (..)
 import Utils.Ops exposing (..)
 
 
