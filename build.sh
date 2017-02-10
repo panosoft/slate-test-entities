@@ -1,1 +1,1 @@
-elm make --output /dev/null
+elm make Test/App.elm --output elm.js

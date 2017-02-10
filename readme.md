@@ -1,6 +1,6 @@
 # Test Entities for testing Slate functionality
 
-> Some test entities for testing Slate components, e.g. Query Engine, Command Helper.
+> Entities for testing Slate components, e.g. Query Engine, Command Helper.
 
 ## Install
 
@@ -8,6 +8,109 @@
 
 Since the Elm Package Manager doesn't allow for Native code and most everything we write at Panoramic Software has some native code in it,
 you have to install this library directly from GitHub, e.g. via [elm-github-install](https://github.com/gdotdesign/elm-github-install) or some equivalent mechanism. It's just not worth the hassle of putting libraries into the Elm package manager until it allows native code.
+
+## Purpose
+
+This repo servers 2 purposes:
+
+1. Provide Entity implementations for testing reads and writes of Slate Events
+2. Example of how to implement Entities
+
+Entities have 3 parts:
+
+1. Implementation
+2. Schema
+3. Command Processor (API)
+
+
+## Entity Implementation
+
+The Entity Implementation contains the following:
+
+1. Entire Entity - This is the Entire Entity with all of its Properties. All properties are defined as `Maybes` except `Lists` since they can be empty.
+2. Entire Entity Dictionary - This is just for convenience so code that uses the Entity won't have to constantly define this.
+3. Default Entire Entity - This is also for convenience so Projection code can have default values. Usually, `Strings` are empty, `Ints` are invalid values, `Dictionaries` are `Dict.empty` and `Lists` are empty. This is also used for `Schema Migration`. In that case, default values are usually non-empty to support older versions of an Entity.
+4. Value objects - Value Object definitions for all Value Object Properties.
+5. Entire Entity Shell - An empty Entire Entity as a starting point for mutations. Used internally, but also exported for convenience.
+6. Entire Entity Encode Function - This function takes an Entire Entity and produces a JSON String.
+7. Entire Entity Decode Function - This function takes a JSON String and produces Entire Entity (wrapped in a `Result`).
+8. Handle Mutation Function - This function mutates the appropriate Entity in an Entire Entity Dictionary based on the specified Event.
+9. Mutate - This function mutates a single Entity based on the specified Event.
+
+Here is the Person Entity's module definition (Note here `Name` is a `Value Object`):
+
+```elm
+module Slate.TestEntities.PersonEntity
+    exposing
+        ( EntirePerson
+        , EntirePersonDict
+        , DefaultEntirePerson
+        , Name
+        , entirePersonShell
+        , defaultEntirePerson
+        , entirePersonEncode
+        , entirePersonDecode
+        , handleMutation
+        , mutate
+        )
+```
+## Mutation Interface
+
+The mutation functions signatures are dependent on the structure of the Entity and its relationships.
+
+
+### handleMutation
+
+This function mutates the appropriate Entity in an Entire Entity Dictionary based on the specified Event.
+
+Here is Address Entity's `handleMutation` function:
+
+```elm
+handleMutation : EntireAddressDict -> Event -> Result String EntireAddressDict
+handleMutation dict event =
+```
+
+It takes an `EntireAddress` dictionary, a mutation event and returns a new dictionary wrapped in a `Result`.
+
+This is as simple as it gets.
+
+A more complex example is Person's `handleMutation`:
+
+```elm
+handleMutation : EntirePersonDict -> EntireAddressDict -> Event -> ( Result String EntirePersonDict, Maybe CascadingDelete )
+handleMutation dict addresses event
+```
+
+Notice that since `Person` has a relationship with the `Address` Entity it needs the dictionary of Addresses (2nd parameter).
+
+Also, since Person has an ownership relationship (see [Person Schema](#person-schema)), it returns a tuple where the first is the new `Person` dictionary and the second is a `Maybe CascadingDelete` that may contain information that describes how to delete an owned Entity.
+
+
+### mutate
+
+This function mutates a single Entity based on the specified Event. This is called internally by `handleMutation` but is exported in case the App wants to do processing on a single Entity.
+
+Here is Address Entity's `mutate` function:
+
+```elm
+mutate : Event -> EntireAddress -> Result String (Maybe EntireAddress)
+mutate event entity =
+```
+
+It takes the Event, the Entire Entity to mutate and returns a new Entire Entity.
+
+Doesn't get simpler than this.
+
+Person's `mutate` is only slightly more complex:
+
+```elm
+mutate : Event -> EntirePerson -> EntireAddressDict -> ( Result String (Maybe EntirePerson), Maybe CascadingDelete )
+mutate event entity addresses =
+```
+
+In addition to the usual suspects, it also takes an Entire Address dictionary. This is because it has a relationship with `Address`. An Entity that has relationships will have an **extra parameter** like this **for each relationship**.
+
+It also returns an extra return value for optional cascading delete information.
 
 ## Person Entity
 

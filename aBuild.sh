@@ -1,1 +1,1 @@
-rm -r elm-stuff/build-artifacts && elm make --output /dev/null
+rm -r elm-stuff/build-artifacts && elm make Test/App.elm --output elm.js
