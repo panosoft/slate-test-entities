@@ -24,27 +24,21 @@ import Slate.Common.Entity exposing (..)
 import Slate.Common.Utils exposing (..)
 
 
-createDestroyAddRemoveInternal : (schema -> Event -> Event) -> String -> String -> String -> schema -> InternalFunction msg
-createDestroyAddRemoveInternal validateFunction eventOp commandOp entityType schema mutatingEventData config dbConnectionInfo initiatorId model =
-    ( List.map (encodeMutatingEvent << validateFunction schema)
-        [ { name = entityType +-+ eventOp
-          , version = Nothing
-          , data = Mutating <| mutatingEventData
-          , metadata = { initiatorId = initiatorId, command = commandOp +-+ (toLower entityType) }
-          }
-        ]
-    , []
-    )
-
-
-addRemoveInternal : String -> String -> String -> PropertySchema -> InternalFunction msg
-addRemoveInternal =
-    createDestroyAddRemoveInternal validatePropertyEventName
-
-
-createDestroyInternal : String -> String -> String -> EntitySchema -> InternalFunction msg
-createDestroyInternal =
-    createDestroyAddRemoveInternal validateEntityEventName
+createDestroyAddRemoveInternal : (schema -> Event -> Event) -> String -> String -> String -> String -> schema -> InternalFunction msg
+createDestroyAddRemoveInternal validateFunction eventOp commandPrefix commandSuffix entityType schema mutatingEventData config dbConnectionInfo initiatorId model =
+    let
+        paddedCommandSuffix =
+            (commandSuffix == "") ? ( "", " " ++ commandSuffix )
+    in
+        ( List.map (encodeMutatingEvent << validateFunction schema)
+            [ { name = entityType +-+ eventOp
+              , version = Nothing
+              , data = Mutating <| mutatingEventData
+              , metadata = { initiatorId = initiatorId, command = commandPrefix +-+ (toLower entityType) ++ paddedCommandSuffix }
+              }
+            ]
+        , []
+        )
 
 
 propertySchema : String -> List PropertySchema -> PropertySchema
@@ -57,33 +51,34 @@ propertySchema propName propertySchemas =
         ?!= (\_ -> Debug.crash <| "Invalid property name:" +-+ propName)
 
 
+createDestroyInternal : String -> String -> String -> String -> EntitySchema -> InternalFunction msg
+createDestroyInternal =
+    createDestroyAddRemoveInternal validateEntityEventName
+
+
+addRemoveInternal : String -> String -> String -> String -> PropertySchema -> InternalFunction msg
+addRemoveInternal =
+    createDestroyAddRemoveInternal validatePropertyEventName
+
+
 createInternal : String -> EntitySchema -> InternalFunction msg
 createInternal =
-    createDestroyInternal "created" "Create"
+    createDestroyInternal "created" "Create" ""
 
 
 destroyInternal : String -> EntitySchema -> InternalFunction msg
 destroyInternal =
-    createDestroyInternal "destroyed" "Destroy"
+    createDestroyInternal "destroyed" "Destroy" ""
 
 
 addInternal : String -> String -> PropertySchema -> InternalFunction msg
 addInternal propName =
-    addRemoveInternal (propName +-+ "added") "Add"
+    addRemoveInternal (propName +-+ "added") "Add" (toLower propName)
 
 
 removeInternal : String -> String -> PropertySchema -> InternalFunction msg
 removeInternal propName =
-    addRemoveInternal (propName +-+ "removed") "Remove"
-
-
-process : InternalFunction msg -> ProcessCmd msg
-process internal mutatingEventData config dbConnectionInfo initiatorId model =
-    let
-        ( events, lockEntityIds ) =
-            internal mutatingEventData config dbConnectionInfo initiatorId model
-    in
-        CommandProcessor.process config dbConnectionInfo Nothing lockEntityIds events model
+    addRemoveInternal (propName +-+ "removed") "Remove" (toLower propName)
 
 
 addPropertyInternal : String -> List PropertySchema -> String -> InternalFunction msg
@@ -94,6 +89,15 @@ addPropertyInternal entityType propertySchemas propName =
 removePropertyInternal : String -> List PropertySchema -> String -> InternalFunction msg
 removePropertyInternal entityType propertySchemas propName =
     removeInternal propName entityType (propertySchema propName propertySchemas)
+
+
+process : InternalFunction msg -> ProcessCmd msg
+process internal mutatingEventData config dbConnectionInfo initiatorId model =
+    let
+        ( events, lockEntityIds ) =
+            internal mutatingEventData config dbConnectionInfo initiatorId model
+    in
+        CommandProcessor.process config dbConnectionInfo Nothing lockEntityIds events model
 
 
 internalEntries : EntitySchema -> List PropertySchema -> List ( String, InternalFunction msg )

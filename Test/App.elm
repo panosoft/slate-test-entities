@@ -13,6 +13,7 @@ import Slate.Command.Processor as CommandProcessor
 import Slate.TestEntities.AddressCommand as AddressCommand
 import Slate.TestEntities.PersonCommand as PersonCommand
 import Utils.Ops exposing (..)
+import Utils.Func exposing (..)
 import Utils.Error exposing (..)
 import Utils.Log exposing (..)
 import StringUtils exposing ((+-+), (+++))
@@ -123,9 +124,6 @@ update msg model =
 
             StartApp ->
                 let
-                    applyParams3 p1 p2 p3 =
-                        ((|>) p1) >> ((|>) p2) >> ((|>) p3)
-
                     fromDict : Dict String (ProcessCmd Msg) -> String -> ProcessCmd Msg
                     fromDict dict key =
                         Dict.get key dict ?!= (\_ -> Debug.crash ("Unable to find key:" +-+ "in dict:" +-+ dict))
@@ -148,7 +146,7 @@ update msg model =
                                     ( commandProcessorModel, List.append commands [ ( commandId, cmd ) ] )
                             )
                             ( model.commandProcessorModel, [] )
-                            (List.map (applyParams3 commandProcessorConfig dbConnectionInfo "999888777")
+                            (List.map (apply3 commandProcessorConfig dbConnectionInfo "999888777")
                                 [ (fromPerson "create") (createDestroyData "123")
                                 , (fromPerson "create") (createDestroyData "456")
                                 , (fromAddress "create") (createDestroyData "789")
