@@ -4,6 +4,7 @@ module Slate.TestEntities.Common.Helper
         , InternalFunction
         , ProcessCmdParams
         , ProcessCmd
+        , propertySchema
         , createInternal
         , destroyInternal
         , addInternal
@@ -27,6 +28,7 @@ import StringUtils exposing (..)
 import Utils.Ops exposing (..)
 import Slate.Command.Processor as CommandProcessor exposing (Config, Model)
 import Slate.Command.Common.Command exposing (..)
+import Slate.Command.Common.Validator exposing (..)
 import Slate.Common.Db exposing (..)
 import Slate.Common.Schema exposing (..)
 import Slate.Common.Event exposing (..)
@@ -49,16 +51,6 @@ createDestroyAddRemoveInternal validateFunction eventOp commandPrefix commandSuf
             ]
         , []
         )
-
-
-propertySchema : String -> List PropertySchema -> PropertySchema
-propertySchema propName propertySchemas =
-    (List.head <|
-        List.filter
-            (\propSchema -> propSchema.name == propName)
-            propertySchemas
-    )
-        ?!= (\_ -> Debug.crash <| "Invalid property name:" +-+ propName)
 
 
 createDestroyInternal : String -> String -> String -> String -> EntitySchema -> InternalFunction msg
@@ -117,6 +109,16 @@ type alias ProcessCmd msg =
 -- used by Entity Command implementation
 
 
+propertySchema : String -> List PropertySchema -> PropertySchema
+propertySchema propName propertySchemas =
+    (List.head <|
+        List.filter
+            (\propSchema -> propSchema.name == propName)
+            propertySchemas
+    )
+        ?!= (\_ -> Debug.crash <| "Invalid property name:" +-+ propName)
+
+
 createInternal : String -> EntitySchema -> InternalFunction msg
 createInternal =
     createDestroyInternal "created" "Create" ""
@@ -154,20 +156,20 @@ buildInternalDict entitySchema propertySchemas ignoreProperties =
 
 buildProcessDict : EntitySchema -> List PropertySchema -> List String -> Dict String (ProcessCmd msg)
 buildProcessDict entitySchema propertySchemas ignoreProperties =
-    Dict.fromList <| List.map (\( name, f ) -> ( name, process f )) <| internalEntries entitySchema propertySchemas ignoreProperties
+    Dict.fromList <| List.map (\( name, f ) -> ( name, process Nothing f )) <| internalEntries entitySchema propertySchemas ignoreProperties
 
 
 
 -- used by Apps or higher-level APIs
 
 
-process : InternalFunction msg -> ProcessCmd msg
-process internal mutatingEventData config dbConnectionInfo initiatorId model =
+process : Maybe (ValidateTagger CommandProcessor.Msg msg) -> InternalFunction msg -> ProcessCmd msg
+process tagger internal mutatingEventData config dbConnectionInfo initiatorId model =
     let
         ( events, lockEntityIds ) =
             internal mutatingEventData config dbConnectionInfo initiatorId
     in
-        CommandProcessor.process config dbConnectionInfo Nothing lockEntityIds events model
+        CommandProcessor.process config dbConnectionInfo tagger lockEntityIds events model
 
 
 combine : List ( List String, List EntityReference ) -> ( List String, List EntityReference )

@@ -10,6 +10,7 @@ import ParentChildUpdate exposing (..)
 import Slate.Common.Db exposing (..)
 import Slate.Command.Common.Command exposing (..)
 import Slate.Command.Processor as CommandProcessor
+import Slate.Command.Common.Validator as Validator
 import Slate.TestEntities.AddressCommand as AddressCommand
 import Slate.TestEntities.PersonCommand as PersonCommand
 import Utils.Ops exposing (..)
@@ -65,6 +66,8 @@ type Msg
     | CommandError ( CommandId, String )
     | CommandSuccess CommandId
     | CommandsComplete
+    | ValidateAddName String (Validator.ValidateErrorTagger CommandProcessor.Msg) (Validator.ValidateSuccessTagger CommandProcessor.Msg) CommandId DbConnectionInfo
+    | ValidateNames (List String) (Validator.ValidateErrorTagger CommandProcessor.Msg) (Validator.ValidateSuccessTagger CommandProcessor.Msg) CommandId DbConnectionInfo
 
 
 initModel : ( Model, List (Cmd Msg) )
@@ -145,9 +148,9 @@ update msg model =
                                     , (fromPerson "create") (createDestroyData "456")
                                     , (fromAddress "create") (createDestroyData "789")
                                       -- , (fromPerson "addName") (addRemoveData "123" """{"first": "Joe", "middle": "", "last": "Mama"}""")
-                                      --   , (fromPerson "addName") (addRemoveData "456" """{"first": "Mickey", "middle": "", "last": "Mouse"}""")
-                                    , Helper.process PersonCommand.addName <| (addRemoveData "123" """{"first": "Joe", "middle": "", "last": "Mama"}""")
-                                    , Helper.process PersonCommand.addName <| (addRemoveData "456" """{"first": "Mickey", "middle": "", "last": "Mouse"}""")
+                                      -- , (fromPerson "addName") (addRemoveData "456" """{"first": "Mickey", "middle": "", "last": "Mouse"}""")
+                                    , Helper.process (Just <| ValidateAddName "Joe Mama") PersonCommand.addName <| (addRemoveData "123" """{"first": "Joe", "middle": "", "last": "Mama"}""")
+                                    , Helper.process (Just <| ValidateAddName "Mickey Mouse") PersonCommand.addName <| (addRemoveData "456" """{"first": "Mickey", "middle": "", "last": "Mouse"}""")
                                     , (fromAddress "addStreet") (addRemoveData "789" "Main Street")
                                     , (fromPerson "addAddress") (addRemoveReferenceData "456" "789")
                                     , (fromPerson "removeAddress") (addRemoveReferenceData "456" "789")
@@ -183,12 +186,12 @@ update msg model =
                                     |> Helper.combine
 
                             ( commandProcessorModel, cmd, commandId ) =
-                                CommandProcessor.process commandProcessorConfig dbConnectionInfo Nothing lockEntityIds events model.commandProcessorModel
+                                CommandProcessor.process commandProcessorConfig dbConnectionInfo (Just <| ValidateNames [ "Joe Mama", "Mickey Mouse" ]) ("dummylock" :: lockEntityIds) events model.commandProcessorModel
                         in
                             { model | commandProcessorModel = commandProcessorModel } ! [ cmd ]
                 in
-                    -- asOneCmd
-                    asMultCmds
+                    -- asMultCmds
+                    asOneCmd
 
             NextCommand ->
                 case model.commands of
@@ -240,6 +243,22 @@ update msg model =
 
             CommandProcessorModule msg ->
                 updateCommandProcessor msg model
+
+            ValidateAddName name errorTagger successTagger commandId dbConnectionInfo ->
+                let
+                    l =
+                        Debug.log "ValidateAddName" name
+                in
+                    -- updateCommandProcessor (errorTagger (commandId, "bad things would happen")) model
+                    updateCommandProcessor (successTagger commandId) model
+
+            ValidateNames names errorTagger successTagger commandId dbConnectionInfo ->
+                let
+                    l =
+                        Debug.log "ValidateNames" names
+                in
+                    -- updateCommandProcessor (errorTagger (commandId, "bad things would happen")) model
+                    updateCommandProcessor (successTagger commandId) model
 
 
 subscriptions : Model -> Sub Msg
