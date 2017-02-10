@@ -15,6 +15,12 @@ import Slate.TestEntities.AddressSchema exposing (..)
 import Slate.TestEntities.Common.Helper as Helper exposing (InternalFunction, ProcessCmd)
 
 
+ignoreProperties : List String
+ignoreProperties =
+    []
+
+
+
 -- API
 
 
@@ -23,7 +29,7 @@ import Slate.TestEntities.Common.Helper as Helper exposing (InternalFunction, Pr
 -}
 internalDict : Dict String (InternalFunction msg)
 internalDict =
-    Helper.buildInternalDict addressSchema addressProperties
+    Helper.buildInternalDict addressSchema addressProperties ignoreProperties
 
 
 {-|
@@ -31,4 +37,4 @@ internalDict =
 -}
 processDict : Dict String (ProcessCmd msg)
 processDict =
-    Helper.buildProcessDict addressSchema addressProperties
+    Helper.buildProcessDict addressSchema addressProperties ignoreProperties

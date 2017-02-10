@@ -109,6 +109,11 @@ main =
         }
 
 
+fromDict : Dict String a -> String -> a
+fromDict dict key =
+    Dict.get key dict ?!= (\_ -> Debug.crash ("Unable to find key:" +-+ "in dict:" +-+ dict))
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
@@ -124,41 +129,66 @@ update msg model =
 
             StartApp ->
                 let
-                    fromDict : Dict String (ProcessCmd Msg) -> String -> ProcessCmd Msg
-                    fromDict dict key =
-                        Dict.get key dict ?!= (\_ -> Debug.crash ("Unable to find key:" +-+ "in dict:" +-+ dict))
+                    asMultCmds =
+                        let
+                            fromAddress : String -> ProcessCmd Msg
+                            fromAddress =
+                                fromDict AddressCommand.processDict
 
-                    fromAddress : String -> ProcessCmd Msg
-                    fromAddress =
-                        fromDict AddressCommand.processDict
+                            fromPerson : String -> ProcessCmd Msg
+                            fromPerson =
+                                fromDict PersonCommand.processDict
 
-                    fromPerson : String -> ProcessCmd Msg
-                    fromPerson =
-                        fromDict PersonCommand.processDict
+                            ( commandProcessorModel, commands ) =
+                                (List.map (apply3 commandProcessorConfig dbConnectionInfo "999888777")
+                                    [ (fromPerson "create") (createDestroyData "123")
+                                    , (fromPerson "create") (createDestroyData "456")
+                                    , (fromAddress "create") (createDestroyData "789")
+                                      -- , (fromPerson "addName") (addRemoveData "123" """{"first": "Joe", "middle": "", "last": "Mama"}""")
+                                      --   , (fromPerson "addName") (addRemoveData "456" """{"first": "Mickey", "middle": "", "last": "Mouse"}""")
+                                    , Helper.process PersonCommand.addName <| (addRemoveData "123" """{"first": "Joe", "middle": "", "last": "Mama"}""")
+                                    , Helper.process PersonCommand.addName <| (addRemoveData "456" """{"first": "Mickey", "middle": "", "last": "Mouse"}""")
+                                    , (fromAddress "addStreet") (addRemoveData "789" "Main Street")
+                                    , (fromPerson "addAddress") (addRemoveReferenceData "456" "789")
+                                    , (fromPerson "removeAddress") (addRemoveReferenceData "456" "789")
+                                    ]
+                                )
+                                    |> Helper.asCmds model.commandProcessorModel
+                        in
+                            update NextCommand { model | commandProcessorModel = commandProcessorModel, commands = commands }
 
-                    ( commandProcessorModel, commands ) =
-                        List.foldl
-                            (\process ( model, commands ) ->
-                                let
-                                    ( commandProcessorModel, cmd, commandId ) =
-                                        process model
-                                in
-                                    ( commandProcessorModel, List.append commands [ ( commandId, cmd ) ] )
-                            )
-                            ( model.commandProcessorModel, [] )
-                            (List.map (apply3 commandProcessorConfig dbConnectionInfo "999888777")
-                                [ (fromPerson "create") (createDestroyData "123")
-                                , (fromPerson "create") (createDestroyData "456")
-                                , (fromAddress "create") (createDestroyData "789")
-                                , (fromPerson "addName") (addRemoveData "123" """{"first": "Joe", "middle": "", "last": "Mama"}""")
-                                , (fromPerson "addName") (addRemoveData "456" """{"first": "Mickey", "middle": "", "last": "Mouse"}""")
-                                , (fromAddress "addStreet") (addRemoveData "789" "Main Street")
-                                , (fromPerson "addAddress") (addRemoveReferenceData "456" "789")
-                                , (fromPerson "removeAddress") (addRemoveReferenceData "456" "789")
-                                ]
-                            )
+                    asOneCmd =
+                        let
+                            fromAddress : String -> InternalFunction Msg
+                            fromAddress =
+                                fromDict AddressCommand.internalDict
+
+                            fromPerson : String -> InternalFunction Msg
+                            fromPerson =
+                                fromDict PersonCommand.internalDict
+
+                            ( events, lockEntityIds ) =
+                                List.map (apply3 commandProcessorConfig dbConnectionInfo "999888777")
+                                    [ (fromPerson "create") (createDestroyData "123")
+                                    , (fromPerson "create") (createDestroyData "456")
+                                    , (fromAddress "create") (createDestroyData "789")
+                                      -- , (fromPerson "addName") (addRemoveData "123" """{"first": "Joe", "middle": "", "last": "Mama"}""")
+                                      -- , (fromPerson "addName") (addRemoveData "456" """{"first": "Mickey", "middle": "", "last": "Mouse"}""")
+                                    , PersonCommand.addName <| (addRemoveData "123" """{"first": "Joe", "middle": "", "last": "Mama"}""")
+                                    , PersonCommand.addName <| (addRemoveData "456" """{"first": "Mickey", "middle": "", "last": "Mouse"}""")
+                                    , (fromAddress "addStreet") (addRemoveData "789" "Main Street")
+                                    , (fromPerson "addAddress") (addRemoveReferenceData "456" "789")
+                                    , (fromPerson "removeAddress") (addRemoveReferenceData "456" "789")
+                                    ]
+                                    |> Helper.combine
+
+                            ( commandProcessorModel, cmd, commandId ) =
+                                CommandProcessor.process commandProcessorConfig dbConnectionInfo Nothing lockEntityIds events model.commandProcessorModel
+                        in
+                            { model | commandProcessorModel = commandProcessorModel } ! [ cmd ]
                 in
-                    update NextCommand { model | commandProcessorModel = commandProcessorModel, commands = commands }
+                    -- asOneCmd
+                    asMultCmds
 
             NextCommand ->
                 case model.commands of

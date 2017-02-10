@@ -2,12 +2,22 @@ module Slate.TestEntities.Common.Helper
     exposing
         ( InternalFunctionParams
         , InternalFunction
+        , ProcessCmdParams
         , ProcessCmd
+        , createInternal
+        , destroyInternal
+        , addInternal
+        , removeInternal
+        , addPropertyInternal
+        , removePropertyInternal
+        , buildInternalDict
+        , buildProcessDict
+        , process
+        , combine
+        , asCmds
         , createDestroyData
         , addRemoveData
         , addRemoveReferenceData
-        , buildInternalDict
-        , buildProcessDict
         )
 
 import String exposing (..)
@@ -25,7 +35,7 @@ import Slate.Common.Utils exposing (..)
 
 
 createDestroyAddRemoveInternal : (schema -> Event -> Event) -> String -> String -> String -> String -> schema -> InternalFunction msg
-createDestroyAddRemoveInternal validateFunction eventOp commandPrefix commandSuffix entityType schema mutatingEventData config dbConnectionInfo initiatorId model =
+createDestroyAddRemoveInternal validateFunction eventOp commandPrefix commandSuffix entityType schema mutatingEventData config dbConnectionInfo initiatorId =
     let
         paddedCommandSuffix =
             (commandSuffix == "") ? ( "", " " ++ commandSuffix )
@@ -61,6 +71,52 @@ addRemoveInternal =
     createDestroyAddRemoveInternal validatePropertyEventName
 
 
+internalEntries : EntitySchema -> List PropertySchema -> List String -> List ( String, InternalFunction msg )
+internalEntries entitySchema propertySchemas ignoreProperties =
+    let
+        entityType =
+            entitySchema.type_
+    in
+        List.append
+            [ ( "create", createInternal entityType entitySchema )
+            , ( "destroy", destroyInternal entityType entitySchema )
+            ]
+            (propertySchemas
+                |> List.filter (not << flip List.member ignoreProperties << .name)
+                |> List.map
+                    (\schema ->
+                        [ ( "add" ++ (StringE.toTitleCase schema.name), addPropertyInternal entityType propertySchemas schema.name )
+                        , ( "remove" ++ (StringE.toTitleCase schema.name), removePropertyInternal entityType propertySchemas schema.name )
+                        ]
+                    )
+                |> List.concat
+            )
+
+
+
+-- API
+
+
+type alias InternalFunctionParams msg return =
+    MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> return
+
+
+type alias InternalFunction msg =
+    InternalFunctionParams msg ( List String, List EntityReference )
+
+
+type alias ProcessCmdParams msg return =
+    MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> Model msg -> return
+
+
+type alias ProcessCmd msg =
+    ProcessCmdParams msg ( Model msg, Cmd msg, CommandId )
+
+
+
+-- used by Entity Command implementation
+
+
 createInternal : String -> EntitySchema -> InternalFunction msg
 createInternal =
     createDestroyInternal "created" "Create" ""
@@ -91,50 +147,51 @@ removePropertyInternal entityType propertySchemas propName =
     removeInternal propName entityType (propertySchema propName propertySchemas)
 
 
+buildInternalDict : EntitySchema -> List PropertySchema -> List String -> Dict String (InternalFunction msg)
+buildInternalDict entitySchema propertySchemas ignoreProperties =
+    Dict.fromList <| internalEntries entitySchema propertySchemas ignoreProperties
+
+
+buildProcessDict : EntitySchema -> List PropertySchema -> List String -> Dict String (ProcessCmd msg)
+buildProcessDict entitySchema propertySchemas ignoreProperties =
+    Dict.fromList <| List.map (\( name, f ) -> ( name, process f )) <| internalEntries entitySchema propertySchemas ignoreProperties
+
+
+
+-- used by Apps or higher-level APIs
+
+
 process : InternalFunction msg -> ProcessCmd msg
 process internal mutatingEventData config dbConnectionInfo initiatorId model =
     let
         ( events, lockEntityIds ) =
-            internal mutatingEventData config dbConnectionInfo initiatorId model
+            internal mutatingEventData config dbConnectionInfo initiatorId
     in
         CommandProcessor.process config dbConnectionInfo Nothing lockEntityIds events model
 
 
-internalEntries : EntitySchema -> List PropertySchema -> List ( String, InternalFunction msg )
-internalEntries entitySchema propertySchemas =
+combine : List ( List String, List EntityReference ) -> ( List String, List EntityReference )
+combine operations =
     let
-        entityType =
-            entitySchema.type_
+        ( listEvents, listLockEntityIds ) =
+            operations
+                |> List.foldr (\( events, lockEntityIds ) ( allEvents, allLockEntityIds ) -> ( events :: allEvents, lockEntityIds :: allLockEntityIds )) ( [], [] )
     in
-        List.append
-            [ ( "create", createInternal entityType entitySchema )
-            , ( "destroy", destroyInternal entityType entitySchema )
-            ]
-            (List.concat <|
-                List.map
-                    (\schema ->
-                        [ ( "add" ++ (StringE.toTitleCase schema.name), addPropertyInternal entityType propertySchemas schema.name )
-                        , ( "remove" ++ (StringE.toTitleCase schema.name), removePropertyInternal entityType propertySchemas schema.name )
-                        ]
-                    )
-                    propertySchemas
-            )
+        ( List.concat listEvents, List.concat listLockEntityIds )
 
 
-
--- API
-
-
-type alias InternalFunctionParams msg return =
-    MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> Model msg -> return
-
-
-type alias InternalFunction msg =
-    InternalFunctionParams msg ( List String, List EntityReference )
-
-
-type alias ProcessCmd msg =
-    InternalFunctionParams msg ( Model msg, Cmd msg, CommandId )
+asCmds : CommandProcessor.Model msg -> List (Model msg -> ( Model msg, Cmd msg, CommandId )) -> ( Model msg, List ( CommandId, Cmd msg ) )
+asCmds model operations =
+    List.foldl
+        (\createProcessCmd ( model, commands ) ->
+            let
+                ( commandProcessorModel, cmd, commandId ) =
+                    createProcessCmd model
+            in
+                ( commandProcessorModel, List.append commands [ ( commandId, cmd ) ] )
+        )
+        ( model, [] )
+        operations
 
 
 createDestroyData : EntityReference -> MutatingEventData
@@ -150,13 +207,3 @@ addRemoveData entityId value =
 addRemoveReferenceData : EntityReference -> EntityReference -> MutatingEventData
 addRemoveReferenceData entityId refEntityId =
     MutatingEventData entityId Nothing (Just refEntityId) Nothing Nothing Nothing
-
-
-buildInternalDict : EntitySchema -> List PropertySchema -> Dict String (InternalFunction msg)
-buildInternalDict entitySchema propertySchemas =
-    Dict.fromList <| internalEntries entitySchema propertySchemas
-
-
-buildProcessDict : EntitySchema -> List PropertySchema -> Dict String (ProcessCmd msg)
-buildProcessDict entitySchema propertySchemas =
-    Dict.fromList <| List.map (\( name, f ) -> ( name, process f )) <| internalEntries entitySchema propertySchemas
