@@ -67,7 +67,7 @@ Here is Address Entity's `handleMutation` function:
 
 ```elm
 handleMutation : EntireAddressDict -> Event -> Result String EntireAddressDict
-handleMutation dict event =
+handleMutation dict event
 ```
 
 It takes an `EntireAddress` dictionary, a mutation event and returns a new dictionary wrapped in a `Result`.
@@ -94,7 +94,7 @@ Here is Address Entity's `mutate` function:
 
 ```elm
 mutate : Event -> EntireAddress -> Result String (Maybe EntireAddress)
-mutate event entity =
+mutate event entity
 ```
 
 It takes the Event, the Entire Entity to mutate and returns a new Entire Entity.
@@ -105,7 +105,7 @@ Person's `mutate` is only slightly more complex:
 
 ```elm
 mutate : Event -> EntirePerson -> EntireAddressDict -> ( Result String (Maybe EntirePerson), Maybe CascadingDelete )
-mutate event entity addresses =
+mutate event entity addresses
 ```
 
 In addition to the usual suspects, it also takes an Entire Address dictionary. This is because it has a relationship with `Address`. An Entity that has relationships will have an **extra parameter** like this **for each relationship**.
@@ -271,3 +271,253 @@ Here `mtPropSchema` is a Empty Property Schema that's mutated to make defining P
 * `city` - The name of the city.
 * `state` - The state.
 * `zip` - The zipcode.
+
+## Command Dictionaries
+
+There are 2 types of dictionaries that can be created, Internal and Process.
+
+#### Internal Dictionary
+
+The purpose of this dictionary is to allow the combining of simple CRUD mutations in higher-level API, e.g. to create `Multiple Events` in a `Transaction`. It's values are of type `InternalFunction`.
+
+This dictionary has the following default keys:
+
+1. create
+2. destroy
+3. add
+4. remove
+
+Keys `create` and `destroy` are for Entities. Keys `add` and `remove` are for Properites. Any property can be excluded in the dictionary. See `ignoreProperties` in `Slate.TestEntities.PersonCommand`.
+
+Internal Dictionary entries cannot be executed directly. They must be converted to a `ProcessCmd` which can be done with the Helper function `process`.
+
+For usage, see `asMultCmds` in `Test.App`.
+
+#### Process Dictionary
+
+This dictionary is derivitave of the `Interal Dictionary`. Each value of this dictionary will create one or more `Events` in a `Transaction`. It has the same keys but the values are of type `ProcessCmd`.
+
+For usage, see `asOneCmd` in `Test.App`.
+
+## Helper
+
+The Helper module is a set of routines to make developing most Entity Command Processor code easy. If your Entity has simple CRUD mutations, then there is very little code that needs to be written. This can be seen in `Slate.TestEntities.AddressCommand`.
+
+It also contains code to make usage of Command Processors easy. See `Test.App`.
+
+### Dictionary Definitions
+
+#### InternalFunction
+
+Internal function that can be combined with other internal functions to create multiple events in a single transition.
+
+```elm
+type alias InternalFunction msg =
+    MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> ( List String, List EntityReference )
+```
+#### ProcessCmdFunction
+
+Process function that takes a CommandProcessor model and produces an executable Cmd.
+
+```elm
+type alias ProcessToCmdFunction msg =
+	CommandProcessor.Model msg -> ( CommandProcessor.Model msg, Cmd msg, CommandId )
+```
+
+#### ProcessCmd
+
+Process function to create a single event in a single transition.
+
+```elm
+type alias ProcessCmd msg =
+	MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> ProcessToCmdFunction msg
+```
+
+### Entity Command Development Helpers
+
+#### propertySchema
+
+Retrieves the specified property schema from a list of property schemas. CRASHES if not found to prevent bad events in the DB.
+
+```elm
+propertySchema : String -> List PropertySchema -> PropertySchema
+propertySchema propName propertySchemas
+```
+#### createInternal
+
+Create IntenalFunction for "create" event. Not usually used directly but here just in case.
+
+```elm
+createInternal : String -> EntitySchema -> InternalFunction msg
+createInternal
+```
+
+#### destroyInternal
+
+Create IntenalFunction for "destroy" event. Not usually used directly but here just in case.
+
+```elm
+destroyInternal : String -> EntitySchema -> InternalFunction msg
+destroyInternal
+```
+
+#### addInternal
+
+Create IntenalFunction for "add" event. Not usually used directly but here just in case.
+
+```elm
+addInternal : String -> EntitySchema -> InternalFunction msg
+addInternal
+```
+
+#### removeInternal
+
+Create IntenalFunction for "remove" event. Not usually used directly but here just in case.
+
+```elm
+removeInternal : String -> EntitySchema -> InternalFunction msg
+removeInternal
+```
+
+#### addPropertyInternal
+
+    Create IntenalFunction for "add" event from an Entity's Properties. Not usually used directly but here just in case.
+
+```elm
+addPropertyInternal : String -> List PropertySchema -> String -> InternalFunction msg
+addPropertyInternal entityType propertySchemas propName
+```
+
+
+#### removePropertyInternal
+
+    Create IntenalFunction for "remove" event from an Entity's Properties. Not usually used directly but here just in case.
+
+```elm
+removePropertyInternal : String -> List PropertySchema -> String -> InternalFunction msg
+removePropertyInternal entityType propertySchemas propName
+```
+
+#### buildInternalDict
+
+Build default Internal Dictionary except for specified properties.
+
+```elm
+buildInternalDict : EntitySchema -> List PropertySchema -> List String -> Dict String (InternalFunction msg)
+buildInternalDict entitySchema propertySchemas ignoreProperties
+```
+
+#### buildProcessDict
+
+Build default Process Dictionary except for specified properties.
+
+```elm
+buildProcessDict : EntitySchema -> List PropertySchema -> List String -> Dict String (ProcessCmd msg)
+buildProcessDict entitySchema propertySchemas ignoreProperties
+```
+
+### App Development Helpers
+
+#### process
+
+Convert an InternalFunction to a ProcessCmd with an optional Validator by passing it through the CommandProcessor.
+
+```elm
+process : Maybe (ValidateTagger CommandProcessor.Msg msg) -> InternalFunction msg -> ProcessCmd msg
+process tagger internal mutatingEventData config dbConnectionInfo initiatorId model
+```
+
+__Usage__
+
+See `asMultCmds` in `Test.App`.
+
+#### combine
+
+Combine a List of events and entity references tuple into a single tuple of events and entity references.
+
+```elm
+combine : List ( List String, List EntityReference ) -> ( List String, List EntityReference )
+combine operations
+```
+
+__Usage__
+
+See `asOneCmd` in `Test.App`.
+
+#### asCmds
+
+Takes a list of Process to Cmd functions and passes them sequentially and iteratively the CommandProcessor Model to produce a List of Cmds and a final CommandProcessor Model.
+
+```elm
+asCmds : CommandProcessor.Model msg -> List (ProcessToCmdFunction msg) -> ( CommandProcessor.Model msg, List ( CommandId, Cmd msg ) )
+asCmds model operations
+```
+
+__Usage__
+
+See `asMultCmds` in `Test.App`.
+
+#### createDestroyData
+
+Create mutating event data for a create/destroy event.
+
+```elm
+createDestroyData : EntityReference -> MutatingEventData
+createDestroyData entityId
+```
+
+__Usage__
+
+See `Test.App`.
+
+#### durationData
+
+Create mutating event data for a duration event.
+
+```elm
+durationData : EntityReference -> MutatingEventData
+durationData entityId
+```
+
+__Usage__
+
+See `Test.App`.
+
+#### addRemoveData
+
+Create mutating event data for an add/remove event.
+
+```elm
+addRemoveData : EntityReference -> String -> MutatingEventData
+addRemoveData entityId value
+```
+
+__Usage__
+
+See `Test.App`.
+
+#### addRemoveReferenceData
+
+Create mutating event data for a add/remove reference event.
+
+```elm
+addRemoveReferenceData : EntityReference -> EntityReference -> MutatingEventData
+addRemoveReferenceData entityId refEntityId
+```
+
+__Usage__
+
+See `Test.App`.
+
+#### positionData
+
+Create mutating event data for a position event.
+
+```elm
+positionData : EntityReference -> EntityReference -> Int -> Int -> MutatingEventData
+positionData entityId propertyId oldPosition newPosition =
+```
+
+__Usage__
+
+See `Test.App`.
