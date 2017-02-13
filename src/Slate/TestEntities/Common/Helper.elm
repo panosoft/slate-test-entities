@@ -1,8 +1,6 @@
 module Slate.TestEntities.Common.Helper
     exposing
-        ( InternalFunctionParams
-        , InternalFunction
-        , ProcessCmdParams
+        ( InternalFunction
         , ProcessCmd
         , propertySchema
         , createInternal
@@ -91,20 +89,12 @@ internalEntries entitySchema propertySchemas ignoreProperties =
 -- API
 
 
-type alias InternalFunctionParams msg return =
-    MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> return
-
-
 type alias InternalFunction msg =
-    InternalFunctionParams msg ( List String, List EntityReference )
-
-
-type alias ProcessCmdParams msg return =
-    MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> Model msg -> return
+    MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> ( List String, List EntityReference )
 
 
 type alias ProcessCmd msg =
-    ProcessCmdParams msg ( Model msg, Cmd msg, CommandId )
+    MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> Model msg -> ( Model msg, Cmd msg, CommandId )
 
 
 
