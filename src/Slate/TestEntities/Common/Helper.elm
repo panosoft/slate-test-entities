@@ -17,8 +17,10 @@ module Slate.TestEntities.Common.Helper
         , combine
         , asCmds
         , createDestroyData
+        , durationData
         , addRemoveData
         , addRemoveReferenceData
+        , positionData
         )
 
 import String exposing (..)
@@ -201,6 +203,11 @@ createDestroyData entityId =
     MutatingEventData entityId Nothing Nothing Nothing Nothing Nothing
 
 
+durationData : EntityReference -> MutatingEventData
+durationData entityId =
+    MutatingEventData entityId Nothing Nothing Nothing Nothing Nothing
+
+
 addRemoveData : EntityReference -> String -> MutatingEventData
 addRemoveData entityId value =
     MutatingEventData entityId (Just value) Nothing Nothing Nothing Nothing
@@ -209,3 +216,8 @@ addRemoveData entityId value =
 addRemoveReferenceData : EntityReference -> EntityReference -> MutatingEventData
 addRemoveReferenceData entityId refEntityId =
     MutatingEventData entityId Nothing (Just refEntityId) Nothing Nothing Nothing
+
+
+positionData : EntityReference -> EntityReference -> Int -> Int -> MutatingEventData
+positionData entityId propertyId oldPosition newPosition =
+    MutatingEventData entityId Nothing Nothing (Just propertyId) (Just oldPosition) (Just newPosition)
