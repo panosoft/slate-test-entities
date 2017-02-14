@@ -122,9 +122,9 @@ nameEncode name =
 nameDecoder : JD.Decoder Name
 nameDecoder =
     JD.succeed Name
-        <|| ("first" := JD.string)
-        <|| ("middle" := JD.string)
-        <|| ("last" := JD.string)
+        <|| (field "first" JD.string)
+        <|| (field "middle" JD.string)
+        <|| (field "last" JD.string)
 
 
 
@@ -152,9 +152,9 @@ entirePersonDecode : String -> Result String EntirePerson
 entirePersonDecode json =
     JD.decodeString
         ((JD.succeed EntirePerson)
-            <|| ("name" := JD.maybe nameDecoder)
-            <|| ("age" := JD.maybe JD.int)
-            <|| ("address" := JD.maybe entityReferenceDecoder)
+            <|| (field "name" <| JD.maybe nameDecoder)
+            <|| (field "age" <| JD.maybe JD.int)
+            <|| (field "address" <| JD.maybe entityReferenceDecoder)
         )
         json
 

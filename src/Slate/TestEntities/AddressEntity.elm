@@ -101,10 +101,10 @@ entireAddressDecode : String -> Result String EntireAddress
 entireAddressDecode json =
     JD.decodeString
         ((JD.succeed EntireAddress)
-            <|| ("street" := JD.maybe JD.string)
-            <|| ("city" := JD.maybe JD.string)
-            <|| ("state" := JD.maybe JD.string)
-            <|| ("zip" := JD.maybe JD.string)
+            <|| (field "street" <| JD.maybe JD.string)
+            <|| (field "city" <| JD.maybe JD.string)
+            <|| (field "state" <| JD.maybe JD.string)
+            <|| (field "zip" <| JD.maybe JD.string)
         )
         json
 
