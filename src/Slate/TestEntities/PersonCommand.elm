@@ -57,7 +57,7 @@ internalDict =
 {-|
     Process Cmd dictionary.
 -}
-processDict : Dict String (ProcessCmd msg)
+processDict : Dict String (ProcessFunction msg)
 processDict =
     Helper.buildProcessDict personSchema personProperties ignoreProperties
 

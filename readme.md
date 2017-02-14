@@ -289,13 +289,13 @@ This dictionary has the following default keys:
 
 Keys `create` and `destroy` are for Entities. Keys `add` and `remove` are for Properites. Any property can be excluded in the dictionary. See `ignoreProperties` in `Slate.TestEntities.PersonCommand`.
 
-Internal Dictionary entries cannot be executed directly. They must be converted to a `ProcessCmd` which can be done with the Helper function `process`.
+Internal Dictionary entries cannot be executed directly. They must be converted to a `ProcessFunction` which can be done with the Helper function `process`.
 
 For usage, see `asMultCmds` in `Test.App`.
 
 #### Process Dictionary
 
-This dictionary is derivitave of the `Interal Dictionary`. Each value of this dictionary will create one or more `Events` in a `Transaction`. It has the same keys but the values are of type `ProcessCmd`.
+This dictionary is derivitave of the `Interal Dictionary`. Each value of this dictionary will create one or more `Events` in a `Transaction`. It has the same keys but the values are of type `ProcessFunction`.
 
 For usage, see `asOneCmd` in `Test.App`.
 
@@ -324,13 +324,13 @@ type alias ProcessToCmdFunction msg =
 	CommandProcessor.Model msg -> ( CommandProcessor.Model msg, Cmd msg, CommandId )
 ```
 
-#### ProcessCmd
+#### ProcessFunction
 
 Process function to create a single event in a single transition.
 
 ```elm
-type alias ProcessCmd msg =
-	MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> ProcessToCmdFunction msg
+type alias ProcessFunction msg =
+    MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> ProcessToCmdFunction msg
 ```
 
 ### Entity Command Development Helpers
@@ -412,7 +412,7 @@ buildInternalDict entitySchema propertySchemas ignoreProperties
 Build default Process Dictionary except for specified properties.
 
 ```elm
-buildProcessDict : EntitySchema -> List PropertySchema -> List String -> Dict String (ProcessCmd msg)
+buildProcessDict : EntitySchema -> List PropertySchema -> List String -> Dict String (ProcessFunction msg)
 buildProcessDict entitySchema propertySchemas ignoreProperties
 ```
 
@@ -420,10 +420,10 @@ buildProcessDict entitySchema propertySchemas ignoreProperties
 
 #### process
 
-Convert an InternalFunction to a ProcessCmd with an optional Validator by passing it through the CommandProcessor.
+Convert an InternalFunction to a ProcessFunction with an optional Validator by passing it through the CommandProcessor.
 
 ```elm
-process : Maybe (ValidateTagger CommandProcessor.Msg msg) -> InternalFunction msg -> ProcessCmd msg
+process : Maybe (ValidateTagger CommandProcessor.Msg msg) -> InternalFunction msg -> ProcessFunction msg
 process tagger internal mutatingEventData config dbConnectionInfo initiatorId model
 ```
 
