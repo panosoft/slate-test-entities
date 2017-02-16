@@ -1,18 +1,18 @@
 module Slate.TestEntities.AddressCommand
     exposing
-        ( internalDict
-        , processDict
+        ( partsDict
+        , commandDict
         )
 
 {-|
     Address Commands.
 
-@docs  internalDict, processDict
+@docs  partsDict, commandDict
 -}
 
 import Dict exposing (Dict)
 import Slate.TestEntities.AddressSchema exposing (..)
-import Slate.TestEntities.Common.Helper as Helper exposing (InternalFunction, ProcessFunction)
+import Slate.TestEntities.Common.Helper as Helper exposing (CommandPartFunction, CommandFunction)
 
 
 ignoreProperties : List String
@@ -25,16 +25,16 @@ ignoreProperties =
 
 
 {-|
-    Internal function dictionary.
+    Command parts dictionary.
 -}
-internalDict : Dict String (InternalFunction msg)
-internalDict =
-    Helper.buildInternalDict addressSchema addressProperties ignoreProperties
+partsDict : Dict String (CommandPartFunction msg)
+partsDict =
+    Helper.buildPartsDict addressSchema addressProperties ignoreProperties
 
 
 {-|
-    Process Cmd dictionary.
+    Command dictionary.
 -}
-processDict : Dict String (ProcessFunction msg)
-processDict =
-    Helper.buildProcessDict addressSchema addressProperties ignoreProperties
+commandDict : Dict String (CommandFunction msg)
+commandDict =
+    Helper.buildCommandDict addressSchema addressProperties ignoreProperties

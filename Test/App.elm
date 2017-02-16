@@ -130,15 +130,16 @@ update msg model =
 
             StartApp ->
                 let
+                    {- a single Cmd is a transaction; so each Command is executed in its own transaction. -}
                     asMultCmds =
                         let
-                            fromAddress : String -> ProcessFunction Msg
+                            fromAddress : String -> CommandFunction Msg
                             fromAddress =
-                                fromDict AddressCommand.processDict
+                                fromDict AddressCommand.commandDict
 
-                            fromPerson : String -> ProcessFunction Msg
+                            fromPerson : String -> CommandFunction Msg
                             fromPerson =
-                                fromDict PersonCommand.processDict
+                                fromDict PersonCommand.commandDict
 
                             ( commandProcessorModel, commands ) =
                                 (List.map (apply3 commandProcessorConfig dbConnectionInfo "999888777")
@@ -158,15 +159,16 @@ update msg model =
                         in
                             update NextCommand { model | commandProcessorModel = commandProcessorModel, commands = commands }
 
+                    {- a single Cmd is a transaction; so each Command is executed in a single transaction. -}
                     asOneCmd =
                         let
-                            fromAddress : String -> InternalFunction Msg
+                            fromAddress : String -> CommandPartFunction Msg
                             fromAddress =
-                                fromDict AddressCommand.internalDict
+                                fromDict AddressCommand.partsDict
 
-                            fromPerson : String -> InternalFunction Msg
+                            fromPerson : String -> CommandPartFunction Msg
                             fromPerson =
-                                fromDict PersonCommand.internalDict
+                                fromDict PersonCommand.partsDict
 
                             ( events, lockEntityIds ) =
                                 List.map (apply3 commandProcessorConfig dbConnectionInfo "999888777")
@@ -188,9 +190,9 @@ update msg model =
                         in
                             { model | commandProcessorModel = commandProcessorModel } ! [ cmd ]
                 in
-                    -- asMultCmds
-                    asOneCmd
+                    asMultCmds
 
+            -- asOneCmd
             NextCommand ->
                 case model.commands of
                     ( _, next ) :: rest ->

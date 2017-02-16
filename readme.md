@@ -278,7 +278,7 @@ There are 2 types of dictionaries that can be created, Internal and Process.
 
 #### Internal Dictionary
 
-The purpose of this dictionary is to allow the combining of simple CRUD mutations in higher-level API, e.g. to create `Multiple Events` in a `Transaction`. It's values are of type `InternalFunction`.
+The purpose of this dictionary is to allow the combining of simple CRUD mutations in higher-level API, e.g. to create `Multiple Events` in a `Transaction`. It's values are of type `CommandPartFunction`.
 
 This dictionary has the following default keys:
 
@@ -289,13 +289,13 @@ This dictionary has the following default keys:
 
 Keys `create` and `destroy` are for Entities. Keys `add` and `remove` are for Properites. Any property can be excluded in the dictionary. See `ignoreProperties` in `Slate.TestEntities.PersonCommand`.
 
-Internal Dictionary entries cannot be executed directly. They must be converted to a `ProcessFunction` which can be done with the Helper function `process`.
+Internal Dictionary entries cannot be executed directly. They must be converted to a `CommandFunction` which can be done with the Helper function `process`.
 
 For usage, see `asMultCmds` in `Test.App`.
 
 #### Process Dictionary
 
-This dictionary is derivitave of the `Interal Dictionary`. Each value of this dictionary will create one or more `Events` in a `Transaction`. It has the same keys but the values are of type `ProcessFunction`.
+This dictionary is derivitave of the `Interal Dictionary`. Each value of this dictionary will create one or more `Events` in a `Transaction`. It has the same keys but the values are of type `CommandFunction`.
 
 For usage, see `asOneCmd` in `Test.App`.
 
@@ -307,30 +307,49 @@ It also contains code to make usage of Command Processors easy. See `Test.App`.
 
 ### Dictionary Definitions
 
-#### InternalFunction
+#### CommandFunctionParams
 
-Internal function that can be combined with other internal functions to create multiple events in a single transition.
-
-```elm
-type alias InternalFunction msg =
-    MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> ( List String, List EntityReference )
-```
-#### ProcessCmdFunction
-
-Process function that takes a CommandProcessor model and produces an executable Cmd.
+Common command function parameters.
 
 ```elm
-type alias ProcessToCmdFunction msg =
-	CommandProcessor.Model msg -> ( CommandProcessor.Model msg, Cmd msg, CommandId )
+type alias CommandFunctionParams msg return =
+    MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> return
 ```
 
-#### ProcessFunction
+#### CommandPartResults
 
-Process function to create a single event in a single transition.
+Result of a CommandPartFunction.
 
 ```elm
-type alias ProcessFunction msg =
-    MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> ProcessToCmdFunction msg
+type alias CommandPartResults =
+    ( List String, List EntityReference )
+```
+
+#### CommandPartFunction
+
+Command part that can be combined with other command parts to be executed in a single transition.
+
+```elm
+type alias CommandPartFunction msg =
+    CommandFunctionParams msg CommandPartResults
+```
+
+#### CommandToCmdFunction
+
+Function that takes a Command, CommandProcessor model and produces an executable Cmd.
+
+```elm
+type alias CommandToCmdFunction msg =
+CommandProcessor.Model msg -> ( CommandProcessor.Model msg, Cmd msg, CommandId )
+```
+
+#### CommandFunction
+
+Command function to create events in a single transition.
+
+```elm
+type alias CommandFunction msg =
+    CommandFunctionParams msg (CommandToCmdFunction msg)
 ```
 
 ### Entity Command Development Helpers
@@ -348,7 +367,7 @@ propertySchema propName propertySchemas
 Create IntenalFunction for "create" event. Not usually used directly but here just in case.
 
 ```elm
-createInternal : String -> EntitySchema -> InternalFunction msg
+createInternal : String -> EntitySchema -> CommandPartFunction msg
 createInternal
 ```
 
@@ -357,7 +376,7 @@ createInternal
 Create IntenalFunction for "destroy" event. Not usually used directly but here just in case.
 
 ```elm
-destroyInternal : String -> EntitySchema -> InternalFunction msg
+destroyInternal : String -> EntitySchema -> CommandPartFunction msg
 destroyInternal
 ```
 
@@ -366,7 +385,7 @@ destroyInternal
 Create IntenalFunction for "add" event. Not usually used directly but here just in case.
 
 ```elm
-addInternal : String -> EntitySchema -> InternalFunction msg
+addInternal : String -> EntitySchema -> CommandPartFunction msg
 addInternal
 ```
 
@@ -375,7 +394,7 @@ addInternal
 Create IntenalFunction for "remove" event. Not usually used directly but here just in case.
 
 ```elm
-removeInternal : String -> EntitySchema -> InternalFunction msg
+removeInternal : String -> EntitySchema -> CommandPartFunction msg
 removeInternal
 ```
 
@@ -384,7 +403,7 @@ removeInternal
     Create IntenalFunction for "add" event from an Entity's Properties. Not usually used directly but here just in case.
 
 ```elm
-addPropertyInternal : String -> List PropertySchema -> String -> InternalFunction msg
+addPropertyInternal : String -> List PropertySchema -> String -> CommandPartFunction msg
 addPropertyInternal entityType propertySchemas propName
 ```
 
@@ -394,36 +413,36 @@ addPropertyInternal entityType propertySchemas propName
     Create IntenalFunction for "remove" event from an Entity's Properties. Not usually used directly but here just in case.
 
 ```elm
-removePropertyInternal : String -> List PropertySchema -> String -> InternalFunction msg
+removePropertyInternal : String -> List PropertySchema -> String -> CommandPartFunction msg
 removePropertyInternal entityType propertySchemas propName
 ```
 
-#### buildInternalDict
+#### buildPartsDict
 
 Build default Internal Dictionary except for specified properties.
 
 ```elm
-buildInternalDict : EntitySchema -> List PropertySchema -> List String -> Dict String (InternalFunction msg)
-buildInternalDict entitySchema propertySchemas ignoreProperties
+buildPartsDict : EntitySchema -> List PropertySchema -> List String -> Dict String (CommandPartFunction msg)
+buildPartsDict entitySchema propertySchemas ignoreProperties
 ```
 
-#### buildProcessDict
+#### buildCommandDict
 
 Build default Process Dictionary except for specified properties.
 
 ```elm
-buildProcessDict : EntitySchema -> List PropertySchema -> List String -> Dict String (ProcessFunction msg)
-buildProcessDict entitySchema propertySchemas ignoreProperties
+buildCommandDict : EntitySchema -> List PropertySchema -> List String -> Dict String (CommandFunction msg)
+buildCommandDict entitySchema propertySchemas ignoreProperties
 ```
 
 ### App Development Helpers
 
 #### process
 
-Convert an InternalFunction to a ProcessFunction with an optional Validator by passing it through the CommandProcessor.
+Convert an CommandPartFunction to a CommandFunction with an optional Validator by passing it through the CommandProcessor.
 
 ```elm
-process : Maybe (ValidateTagger CommandProcessor.Msg msg) -> InternalFunction msg -> ProcessFunction msg
+process : Maybe (ValidateTagger CommandProcessor.Msg msg) -> CommandPartFunction msg -> CommandFunction msg
 process tagger internal mutatingEventData config dbConnectionInfo initiatorId model
 ```
 
@@ -433,7 +452,7 @@ See `asMultCmds` in `Test.App`.
 
 #### combine
 
-Combine a List of events and entity references tuple into a single tuple of events and entity references.
+Combine a List of command part results into a single command part results.
 
 ```elm
 combine : List ( List String, List EntityReference ) -> ( List String, List EntityReference )
@@ -446,7 +465,7 @@ See `asOneCmd` in `Test.App`.
 
 #### asCmds
 
-Takes a list of Process to Cmd functions and passes them sequentially and iteratively the CommandProcessor Model to produce a List of Cmds and a final CommandProcessor Model.
+Takes a list of CommandToCmdFunctions and passes them sequentially and iteratively the CommandProcessor Model to produce a List of Cmds and a final CommandProcessor Model.
 
 ```elm
 asCmds : CommandProcessor.Model msg -> List (ProcessToCmdFunction msg) -> ( CommandProcessor.Model msg, List ( CommandId, Cmd msg ) )

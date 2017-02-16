@@ -1,8 +1,10 @@
 module Slate.TestEntities.Common.Helper
     exposing
-        ( InternalFunction
-        , ProcessToCmdFunction
-        , ProcessFunction
+        ( CommandFunctionParams
+        , CommandPartResults
+        , CommandPartFunction
+        , CommandToCmdFunction
+        , CommandFunction
         , propertySchema
         , createInternal
         , destroyInternal
@@ -10,8 +12,8 @@ module Slate.TestEntities.Common.Helper
         , removeInternal
         , addPropertyInternal
         , removePropertyInternal
-        , buildInternalDict
-        , buildProcessDict
+        , buildPartsDict
+        , buildCommandDict
         , process
         , combine
         , asCmds
@@ -23,8 +25,9 @@ module Slate.TestEntities.Common.Helper
         )
 
 {-|
-    Helper functions for developing Entity Command Processors and their usage easy.
-@docs InternalFunction , ProcessToCmdFunction , ProcessFunction , propertySchema , createInternal , destroyInternal , addInternal , removeInternal , addPropertyInternal , removePropertyInternal , buildInternalDict , buildProcessDict , process , combine , asCmds , createDestroyData , durationData , addRemoveData , addRemoveReferenceData , positionData
+    Helper functions for developing Entity Command Processors and their usage easily.
+
+@docs CommandFunctionParams, CommandPartResults, CommandPartFunction , CommandToCmdFunction , CommandFunction , propertySchema , createInternal , destroyInternal , addInternal , removeInternal , addPropertyInternal , removePropertyInternal , buildPartsDict , buildCommandDict , process , combine , asCmds , createDestroyData , durationData , addRemoveData , addRemoveReferenceData , positionData
 -}
 
 import String exposing (..)
@@ -42,7 +45,7 @@ import Slate.Common.Entity exposing (..)
 import Slate.Common.Utils exposing (..)
 
 
-createDestroyAddRemoveInternal : (schema -> Event -> Event) -> String -> String -> String -> String -> schema -> InternalFunction msg
+createDestroyAddRemoveInternal : (schema -> Event -> Event) -> String -> String -> String -> String -> schema -> CommandPartFunction msg
 createDestroyAddRemoveInternal validateFunction eventOp commandPrefix commandSuffix entityType schema mutatingEventData config dbConnectionInfo initiatorId =
     let
         paddedCommandSuffix =
@@ -59,18 +62,18 @@ createDestroyAddRemoveInternal validateFunction eventOp commandPrefix commandSuf
         )
 
 
-createDestroyInternal : String -> String -> String -> String -> EntitySchema -> InternalFunction msg
+createDestroyInternal : String -> String -> String -> String -> EntitySchema -> CommandPartFunction msg
 createDestroyInternal =
     createDestroyAddRemoveInternal validateEntityEventName
 
 
-addRemoveInternal : String -> String -> String -> String -> PropertySchema -> InternalFunction msg
+addRemoveInternal : String -> String -> String -> String -> PropertySchema -> CommandPartFunction msg
 addRemoveInternal =
     createDestroyAddRemoveInternal validatePropertyEventName
 
 
-internalEntries : EntitySchema -> List PropertySchema -> List String -> List ( String, InternalFunction msg )
-internalEntries entitySchema propertySchemas ignoreProperties =
+partsEntries : EntitySchema -> List PropertySchema -> List String -> List ( String, CommandPartFunction msg )
+partsEntries entitySchema propertySchemas ignoreProperties =
     let
         entityType =
             entitySchema.type_
@@ -96,24 +99,38 @@ internalEntries entitySchema propertySchemas ignoreProperties =
 
 
 {-|
-    Internal function that can be combined with other internal functions to create multiple events in a single transition.
+    Common command function parameters.
 -}
-type alias InternalFunction msg =
-    MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> ( List String, List EntityReference )
+type alias CommandFunctionParams msg return =
+    MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> return
 
 
 {-|
-    Process function that takes a CommandProcessor model and produces an executable Cmd.
+    Result of a CommandPartFunction.
 -}
-type alias ProcessToCmdFunction msg =
+type alias CommandPartResults =
+    ( List String, List EntityReference )
+
+
+{-|
+    Command part that can be combined with other command parts to be executed in a single transition.
+-}
+type alias CommandPartFunction msg =
+    CommandFunctionParams msg CommandPartResults
+
+
+{-|
+    Function that takes a Command, CommandProcessor model and produces an executable Cmd.
+-}
+type alias CommandToCmdFunction msg =
     CommandProcessor.Model msg -> ( CommandProcessor.Model msg, Cmd msg, CommandId )
 
 
 {-|
-    Process function to create a single event in a single transition.
+    Command function to create events in a single transition.
 -}
-type alias ProcessFunction msg =
-    MutatingEventData -> Config msg -> DbConnectionInfo -> InitiatorId -> ProcessToCmdFunction msg
+type alias CommandFunction msg =
+    CommandFunctionParams msg (CommandToCmdFunction msg)
 
 
 
@@ -136,7 +153,7 @@ propertySchema propName propertySchemas =
 {-|
     Create IntenalFunction for "create" event. Not usually used directly but here just in case.
 -}
-createInternal : String -> EntitySchema -> InternalFunction msg
+createInternal : String -> EntitySchema -> CommandPartFunction msg
 createInternal =
     createDestroyInternal "created" "Create" ""
 
@@ -144,7 +161,7 @@ createInternal =
 {-|
     Create IntenalFunction for "destroy" event. Not usually used directly but here just in case.
 -}
-destroyInternal : String -> EntitySchema -> InternalFunction msg
+destroyInternal : String -> EntitySchema -> CommandPartFunction msg
 destroyInternal =
     createDestroyInternal "destroyed" "Destroy" ""
 
@@ -152,7 +169,7 @@ destroyInternal =
 {-|
     Create IntenalFunction for "add" event. Not usually used directly but here just in case.
 -}
-addInternal : String -> String -> PropertySchema -> InternalFunction msg
+addInternal : String -> String -> PropertySchema -> CommandPartFunction msg
 addInternal propName =
     addRemoveInternal (propName +-+ "added") "Add" (toLower propName)
 
@@ -160,7 +177,7 @@ addInternal propName =
 {-|
     Create IntenalFunction for "remove" event. Not usually used directly but here just in case.
 -}
-removeInternal : String -> String -> PropertySchema -> InternalFunction msg
+removeInternal : String -> String -> PropertySchema -> CommandPartFunction msg
 removeInternal propName =
     addRemoveInternal (propName +-+ "removed") "Remove" (toLower propName)
 
@@ -168,7 +185,7 @@ removeInternal propName =
 {-|
     Create IntenalFunction for "add" event from an Entity's Properties. Not usually used directly but here just in case.
 -}
-addPropertyInternal : String -> List PropertySchema -> String -> InternalFunction msg
+addPropertyInternal : String -> List PropertySchema -> String -> CommandPartFunction msg
 addPropertyInternal entityType propertySchemas propName =
     addInternal propName entityType (propertySchema propName propertySchemas)
 
@@ -176,25 +193,25 @@ addPropertyInternal entityType propertySchemas propName =
 {-|
     Create IntenalFunction for "remove" event from an Entity's Properties. Not usually used directly but here just in case.
 -}
-removePropertyInternal : String -> List PropertySchema -> String -> InternalFunction msg
+removePropertyInternal : String -> List PropertySchema -> String -> CommandPartFunction msg
 removePropertyInternal entityType propertySchemas propName =
     removeInternal propName entityType (propertySchema propName propertySchemas)
 
 
 {-|
-    Build default Internal Dictionary except for specified properties.
+    Build default Command Parts Dictionary except for specified properties.
 -}
-buildInternalDict : EntitySchema -> List PropertySchema -> List String -> Dict String (InternalFunction msg)
-buildInternalDict entitySchema propertySchemas ignoreProperties =
-    Dict.fromList <| internalEntries entitySchema propertySchemas ignoreProperties
+buildPartsDict : EntitySchema -> List PropertySchema -> List String -> Dict String (CommandPartFunction msg)
+buildPartsDict entitySchema propertySchemas ignoreProperties =
+    Dict.fromList <| partsEntries entitySchema propertySchemas ignoreProperties
 
 
 {-|
-    Build default Process Dictionary except for specified properties.
+    Build default Command Dictionary except for specified properties.
 -}
-buildProcessDict : EntitySchema -> List PropertySchema -> List String -> Dict String (ProcessFunction msg)
-buildProcessDict entitySchema propertySchemas ignoreProperties =
-    Dict.fromList <| List.map (\( name, f ) -> ( name, process Nothing f )) <| internalEntries entitySchema propertySchemas ignoreProperties
+buildCommandDict : EntitySchema -> List PropertySchema -> List String -> Dict String (CommandFunction msg)
+buildCommandDict entitySchema propertySchemas ignoreProperties =
+    Dict.fromList <| List.map (\( name, f ) -> ( name, process Nothing f )) <| partsEntries entitySchema propertySchemas ignoreProperties
 
 
 
@@ -202,9 +219,9 @@ buildProcessDict entitySchema propertySchemas ignoreProperties =
 
 
 {-|
-    Convert an InternalFunction to a ProcessFunction with an optional Validator by passing it through the CommandProcessor.
+    Convert an CommandPartFunction to a CommandFunction with an optional Validator by passing it through the CommandProcessor.
 -}
-process : Maybe (ValidateTagger CommandProcessor.Msg msg) -> InternalFunction msg -> ProcessFunction msg
+process : Maybe (ValidateTagger CommandProcessor.Msg msg) -> CommandPartFunction msg -> CommandFunction msg
 process tagger internal mutatingEventData config dbConnectionInfo initiatorId model =
     let
         ( events, lockEntityIds ) =
@@ -214,23 +231,23 @@ process tagger internal mutatingEventData config dbConnectionInfo initiatorId mo
 
 
 {-|
-    Combine a List of events and entity references tuple into a single tuple of events and entity references.
+    Combine a List of command part results into a single command part results.
 -}
-combine : List ( List String, List EntityReference ) -> ( List String, List EntityReference )
-combine operations =
+combine : List CommandPartResults -> CommandPartResults
+combine parts =
     let
         ( listEvents, listLockEntityIds ) =
-            operations
+            parts
                 |> List.foldr (\( events, lockEntityIds ) ( allEvents, allLockEntityIds ) -> ( events :: allEvents, lockEntityIds :: allLockEntityIds )) ( [], [] )
     in
         ( List.concat listEvents, List.concat listLockEntityIds )
 
 
 {-|
-    Takes a list of Process to Cmd functions and passes them sequentially and iteratively the CommandProcessor Model to produce a List of Cmds and a final CommandProcessor Model.
+    Takes a list of CommandToCmdFunctions and passes them sequentially and iteratively the CommandProcessor Model to produce a List of Cmds and a final CommandProcessor Model.
 -}
-asCmds : CommandProcessor.Model msg -> List (ProcessToCmdFunction msg) -> ( CommandProcessor.Model msg, List ( CommandId, Cmd msg ) )
-asCmds model operations =
+asCmds : CommandProcessor.Model msg -> List (CommandToCmdFunction msg) -> ( CommandProcessor.Model msg, List ( CommandId, Cmd msg ) )
+asCmds model commands =
     List.foldl
         (\createProcessCmd ( model, commands ) ->
             let
@@ -240,7 +257,7 @@ asCmds model operations =
                 ( newModel, List.append commands [ ( commandId, cmd ) ] )
         )
         ( model, [] )
-        operations
+        commands
 
 
 {-|

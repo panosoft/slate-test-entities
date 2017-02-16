@@ -1,7 +1,7 @@
 module Slate.TestEntities.PersonCommand
     exposing
-        ( internalDict
-        , processDict
+        ( partsDict
+        , commandDict
         , addName
         , removeName
         )
@@ -9,7 +9,7 @@ module Slate.TestEntities.PersonCommand
 {-|
     Person Commands.
 
-@docs  internalDict, processDict
+@docs  partsDict, commandDict
 -}
 
 import Dict exposing (Dict)
@@ -47,25 +47,25 @@ ignoreProperties =
 
 
 {-|
-    Internal function dictionary.
+    Command parts dictionary.
 -}
-internalDict : Dict String (InternalFunction msg)
-internalDict =
-    Helper.buildInternalDict personSchema personProperties ignoreProperties
+partsDict : Dict String (CommandPartFunction msg)
+partsDict =
+    Helper.buildPartsDict personSchema personProperties ignoreProperties
 
 
 {-|
-    Process Cmd dictionary.
+    Command dictionary.
 -}
-processDict : Dict String (ProcessFunction msg)
-processDict =
-    Helper.buildProcessDict personSchema personProperties ignoreProperties
+commandDict : Dict String (CommandFunction msg)
+commandDict =
+    Helper.buildCommandDict personSchema personProperties ignoreProperties
 
 
 {-|
     Manually written add property with validation.
 -}
-addName : InternalFunction msg
+addName : CommandPartFunction msg
 addName mutatingEventData config dbConnectionInfo initiatorId =
     --addPropertyInternal personSchema.type_ personProperties "name"
     let
@@ -86,6 +86,6 @@ addName mutatingEventData config dbConnectionInfo initiatorId =
 {-|
     Manually written remove property.
 -}
-removeName : InternalFunction msg
+removeName : CommandPartFunction msg
 removeName =
     removePropertyInternal personSchema.type_ personProperties "name"
