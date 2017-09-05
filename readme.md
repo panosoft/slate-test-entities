@@ -1,3 +1,6 @@
+# DEPRECATED - Please see [elm-slate/test-entities](https://github.com/elm-slate/test-entities)
+
+
 # Test Entities for testing Slate functionality
 
 > Entities for testing Slate components, e.g. Query Engine, Command Helper.
